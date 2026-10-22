@@ -316,7 +316,10 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
         if (answerMatch && raw.indexOf(explanationMatch[0]) < raw.indexOf(answerMatch[0])) qErrors.push('Explanation must come after the correct-answer line.');
         if (!explanation.trim()) qWarnings.push('Explanation section is empty.');
       }
-      if (/!\[[^\]]*\]\([^)]+\)/.test(raw)) qWarnings.push('This question references an image. Local image files are not imported in this version.');
+      const imageRefs = [...raw.matchAll(/!\[([^\]]*)\]\(([^)]+)\)/g)];
+      if (imageRefs.some((match) => !resolveImageReference(match[2]))) {
+        qWarnings.push('This question references an image that was not found in the imported ZIP package. Include the asset and use a relative path.');
+      }
       const question = {
         number: markerInfo.number,
         label: markerInfo.label,
@@ -334,8 +337,13 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     });
 
     if (markers.length && markers.some((m) => m.number < 1)) errors.push('Question numbers must be positive integers.');
-    if (/!\[[^\]]*\]\([^)]+\)/.test(markdown)) warnings.push('The paper contains image references. This version imports the Markdown file only; ZIP/image-folder import is not implemented yet.');
-    if (/\$\$?[\s\S]+?\$\$?/.test(markdown)) warnings.push('The paper may contain LaTeX math. Mathematical typesetting is not implemented in this version; expressions will display as text.');
+    if (/!\[[^\]]*\]\(([^)]+)\)/.test(markdown)) {
+      const refs = [...markdown.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)];
+      if (refs.some((match) => !resolveImageReference(match[1]))) warnings.push('Some image references could not be resolved. Import a ZIP that includes all referenced image assets.');
+    }
+    if ((markdown.includes('$') || markdown.includes(String.fromCharCode(92) + '(') || markdown.includes(String.fromCharCode(92) + '[')) && typeof window.renderMathInElement !== 'function') {
+      warnings.push('Math expressions were detected, but KaTeX is unavailable. The expressions remain readable as source text.');
+    }
     const counts = {
       questions: paper.questions.length,
       validQuestions: paper.questions.filter((q) => q.errors.length === 0).length,
