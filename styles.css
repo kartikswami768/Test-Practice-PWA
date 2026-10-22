@@ -232,6 +232,10 @@ code { border-radius: 5px; padding: 2px 5px; background: #eff3f0; color: #254d3f
 .markdown-content hr { border: 0; border-top: 1px solid var(--line); margin: 14px 0; }
 .markdown-content a { color: #216747; }
 .image-placeholder { display: inline-block; padding: 8px 10px; border: 1px dashed #d2b879; border-radius: 8px; background: #fff9e9; color: #745b21; font-size: 11px; line-height: 1.5; }
+.markdown-image { margin: 14px 0; text-align: center; }
+.markdown-image img { display: inline-block; max-width: 100%; max-height: 65vh; width: auto; height: auto; object-fit: contain; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+.katex-display { max-width: 100%; overflow-x: auto; overflow-y: hidden; padding: 5px 0 8px; }
+.katex { font-size: 1.02em; }
 .markdown-link-label { color: #216747; text-decoration: underline; text-underline-offset: 2px; }
 @media (min-width: 900px) { .preview-panel { min-height: 500px; } }
 @media (max-width: 900px) {
