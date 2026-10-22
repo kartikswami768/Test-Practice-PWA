@@ -80,12 +80,24 @@
             <h2>Regular practice</h2>
             <p class="muted">See the answer and explanation immediately after choosing an option.</p>
             <fieldset class="settings-fieldset">
-              <legend>Timer per question</legend>
-              <label class="radio-card"><input type="radio" name="practice-timer" value="0" checked><span><strong>Untimed</strong><small>Take as long as you need</small></span></label>
-              <label class="radio-card"><input type="radio" name="practice-timer" value="120"><span><strong>2 minutes</strong><small>Each question has its own timer</small></span></label>
+              <legend>Session mode</legend>
+              <label class="radio-card"><input type="radio" name="session-mode" value="regular" checked><span><strong>Regular practice</strong><small>See the answer and explanation after each answer</small></span></label>
+              <label class="radio-card"><input type="radio" name="session-mode" value="exam"><span><strong>Exam mode</strong><small>One timer for the entire paper; review after submission</small></span></label>
             </fieldset>
-            <div class="rule-note"><span class="note-icon">i</span><p>Exam mode with one consolidated timer will be added after this first working version.</p></div>
-            <button id="start-practice" class="button button-primary full-width" type="button">Start practice <span aria-hidden="true">→</span></button>
+            <div id="regular-timer-settings">
+              <fieldset class="settings-fieldset">
+                <legend>Timer per question</legend>
+                <label class="radio-card"><input type="radio" name="practice-timer" value="0" checked><span><strong>Untimed</strong><small>Take as long as you need</small></span></label>
+                <label class="radio-card"><input type="radio" name="practice-timer" value="120"><span><strong>2 minutes</strong><small>Each unanswered question has its own timer</small></span></label>
+              </fieldset>
+            </div>
+            <div id="exam-duration-settings" class="exam-duration-settings hidden">
+              <label class="duration-label" for="exam-minutes-per-question">Minutes per question</label>
+              <input id="exam-minutes-per-question" class="duration-input" type="number" min="0.25" max="10" step="0.25" value="1" inputmode="decimal">
+              <p id="exam-duration-preview" class="muted small-text">Duration will be calculated from the number of questions.</p>
+            </div>
+            <div class="rule-note"><span class="note-icon">i</span><p id="session-rule-note">In regular practice, the answer and explanation appear as soon as you choose an option.</p></div>
+            <button id="start-practice" class="button button-primary full-width" type="button">Start regular practice <span aria-hidden="true">→</span></button>
             <button id="export-paper" class="button button-secondary full-width" type="button">Download source Markdown</button>
           </aside>
         </div>
