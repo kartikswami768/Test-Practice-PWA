@@ -478,6 +478,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     el('validation-messages').innerHTML = notices.join('');
     el('preview-count').textContent = `${counts.questions} question${counts.questions === 1 ? '' : 's'}`;
     el('preview-list').innerHTML = paper.questions.length ? paper.questions.map(renderQuestionPreview).join('') : '<div class="notice error"><span class="notice-icon">!</span><p>No questions could be parsed. Check that each question starts with a heading like “## Q1”.</p></div>';
+    typesetMath(el('paper-view'));
     el('start-practice').disabled = !valid;
     updateSessionSetup();
   }
@@ -643,6 +644,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     } else if (examMode) {
       updateTimerDisplay();
     }
+    typesetMath(el('practice-view'));
     if (shouldScroll) el('practice-view').scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -823,6 +825,8 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
         return `<div class="preview-option ${optionIsCorrect ? 'is-correct' : ''} ${chosenWrong ? 'chosen-wrong' : ''}"><span class="opt-letter">${escapeHtml(option.label)}.</span><div class="markdown-content">${renderMarkdown(option.text)}</div></div>`;
       }).join('')}</div><p class="answer-key">Correct answer: ${escapeHtml(question.correctAnswer || 'Missing')} · ${escapeHtml(userLabel)}</p><div class="preview-explanation"><h4>Explanation</h4>${question.explanation.trim() ? `<div class="markdown-content">${renderMarkdown(question.explanation)}</div>` : '<p class="muted small-text">No explanation included in source.</p>'}</div></div></details>`;
     }).join('');
+    typesetMath(el('results-view'));
+
   }
 
   function openPackageDB() {
@@ -982,7 +986,20 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     const validation = parsePaper(markdown, filename);
     section.classList.remove('hidden');
     section.innerHTML = `<div style="display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap"><div><p class="eyebrow" style="margin-bottom:6px">LAST OPENED PAPER</p><strong>${escapeHtml(validation.paper.title)}</strong><p class="muted small-text" style="margin:5px 0 0">${escapeHtml(filename)} · ${validation.counts.questions} questions</p></div><button id="restore-recent" class="button button-secondary" type="button">Reopen paper →</button></div>`;
-    el('restore-recent').addEventListener('click', () => setPaper(markdown, filename));
+    el('restore-recent').addEventListener('click', async () => {
+      let type = 'markdown';
+      try { type = localStorage.getItem(STORAGE_IMPORT_TYPE) || 'markdown'; } catch (_) {}
+      if (type === 'zip') {
+        try {
+          const saved = await readLastZipPackage();
+          if (saved && saved.blob) {
+            await loadZipFile(new File([saved.blob], saved.bundleFilename || 'question-paper.zip', { type: 'application/zip' }));
+            return;
+          }
+        } catch (_) { showToast('Saved image package could not be restored; opening Markdown without images.'); }
+      }
+      setPaper(markdown, filename, null);
+    });
   }
 
   function registerEvents() {
