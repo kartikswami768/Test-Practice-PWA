@@ -345,6 +345,26 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     return { paper, errors, warnings, counts, valid: errors.length === 0 && paper.questions.length > 0 };
   }
 
+  function typesetMath(root = document) {
+    if (typeof window.renderMathInElement !== 'function') return;
+    root.querySelectorAll('.markdown-content').forEach((node) => {
+      if (node.dataset.mathTypeset === 'true') return;
+      try {
+        window.renderMathInElement(node, {
+          delimiters: [
+            { left: '$$', right: '$$', display: true },
+            { left: String.fromCharCode(92) + '[', right: String.fromCharCode(92) + ']', display: true },
+            { left: String.fromCharCode(92) + '(', right: String.fromCharCode(92) + ')', display: false },
+            { left: '$', right: '$', display: false }
+          ],
+          throwOnError: false,
+          ignoredTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        });
+        node.dataset.mathTypeset = 'true';
+      } catch (_) {}
+    });
+  }
+
   function showToast(message) {
     const toast = el('toast');
     toast.textContent = message;
