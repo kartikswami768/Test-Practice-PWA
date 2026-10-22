@@ -10,6 +10,10 @@
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.19.0/dist/katex.min.css" integrity="sha384-3rdsX6e5mueWyoweR9NIVmtEsUkokpBT/0ALqKKIBMr9j4qhHkaIkAcGgsE6uVlp" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/jszip@3.10.2/dist/jszip.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.19.0/dist/katex.min.js" integrity="sha384-QFFtAGzvvj+bfgCGxXJlNZZR1nXEZgvG8tDLCCY1F19xl20WlfTYgguB4VcNdxYk" crossorigin="anonymous"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.19.0/dist/contrib/auto-render.min.js" integrity="sha384-bjyGPfbij8/NDKJhSGZNP/khQVgtHUE5exjm4Ydllo42FwIgYsdLO2lXGmRBf5Mz" crossorigin="anonymous"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -40,9 +44,9 @@
           <div class="import-card">
             <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg></div>
             <h2>Open a question paper</h2>
-            <p class="muted">Choose a <code>.md</code> or <code>.markdown</code> file from Files.</p>
-            <label class="button button-primary file-picker" for="paper-file">Choose Markdown file</label>
-            <input id="paper-file" type="file" accept=".md,.markdown,text/markdown,text/plain" hidden>
+            <p class="muted">Choose a Markdown file or ZIP package containing one question paper and its referenced images.</p>
+            <label class="button button-primary file-picker" for="paper-file">Choose Markdown or ZIP</label>
+            <input id="paper-file" type="file" accept=".md,.markdown,.zip,text/markdown,text/plain,application/zip" hidden>
             <button id="sample-button" class="button button-secondary full-width" type="button">Load sample paper</button>
             <p class="microcopy">Your file is processed on this device. It is not uploaded to a server.</p>
           </div>
@@ -145,6 +149,6 @@
     <footer class="app-footer"><span>Recall · Personal MCQ practice</span><span>Made to run locally on your device</span></footer>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="app.js"></script>
+  <script defer src="app.js"></script>
 </body>
 </html>
