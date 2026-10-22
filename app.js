@@ -359,19 +359,40 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     el('main-content').focus({ preventScroll: true });
   }
 
-  function setPaper(markdown, filename = 'question-paper.md') {
+  function clearImportedAssetUrls() {
+    for (const url of state.assetUrls.values()) {
+      try { URL.revokeObjectURL(url); } catch (_) {}
+    }
+    state.assetUrls = new Map();
+  }
+
+  function setPaper(markdown, filename = 'question-paper.md', context = null) {
     stopTimer();
-    state.markdown = markdown.replace(/^\uFEFF/, '');
+    clearImportedAssetUrls();
+    state.markdown = String(markdown || '');
+    if (state.markdown.charCodeAt(0) === 0xFEFF) state.markdown = state.markdown.slice(1);
     state.filename = filename || 'question-paper.md';
+    state.markdownPath = context && context.markdownPath ? context.markdownPath : state.filename;
+    state.importBundleFilename = context && context.bundleFilename ? context.bundleFilename : '';
+    if (context && Array.isArray(context.assets)) {
+      for (const asset of context.assets) {
+        state.assetUrls.set(normalizeArchivePath(asset.path), URL.createObjectURL(asset.blob));
+      }
+    }
     state.validation = parsePaper(state.markdown, state.filename);
     state.paper = state.validation.paper;
     state.practice = null;
     try {
-      // Persist only the latest source paper on-device, to make reopening convenient.
       localStorage.setItem(STORAGE_MARKDOWN, state.markdown);
       localStorage.setItem(STORAGE_FILENAME, state.filename);
-    } catch (_) {
-      // Import should still work if browser storage is unavailable or full.
+      localStorage.setItem(STORAGE_IMPORT_TYPE, context && context.zipFile ? 'zip' : 'markdown');
+    } catch (_) {}
+    if (context && context.zipFile) {
+      saveLastZipPackage(context.zipFile, context.markdownPath, context.bundleFilename).catch(() => {
+        showToast('Paper loaded, but its ZIP could not be saved for restoring images after reload.');
+      });
+    } else {
+      deleteLastZipPackage().catch(() => {});
     }
     renderPaperView();
     showView('paper-view');
