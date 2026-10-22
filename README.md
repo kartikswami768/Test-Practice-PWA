@@ -1,6 +1,6 @@
-# Recall — MCQ Practice PWA (v1)
+# Recall — MCQ Practice PWA (v2)
 
-A local-first Progressive Web App prototype that imports a Markdown question paper, validates the v1 schema, previews the content and runs regular practice with immediate feedback.
+A local-first Progressive Web App that imports a Markdown question paper, validates the v1 schema, previews the content, and supports regular practice plus consolidated-timer exam mode.
 
 ## Included in this prototype
 
@@ -8,16 +8,19 @@ A local-first Progressive Web App prototype that imports a Markdown question pap
 - YAML metadata and question-structure validation.
 - Question preview with options, answer key and explanation.
 - Regular practice in untimed mode or with a per-question 2-minute timer.
-- Immediate answer feedback and explanation after selecting an option.
-- Previous/next navigation and a question-number palette.
-- Session result summary and review of every answer.
+- Exam mode with one consolidated countdown (configurable minutes per question; default 1 minute per question).
+- Hidden answer feedback during exams; exam answers may be changed until submission.
+- Exam setup hides answer keys and explanations in the preview while exam mode is selected.
+- Previous/next navigation and a question-number palette that shows answered vs unanswered questions without marking correctness.
+- Manual exam submission with an unanswered-question confirmation, plus automatic submission when time expires.
+- Exam results with correct/incorrect/unanswered counts and a full answer/explanation review.
+- The exam countdown uses a wall-clock deadline, so backgrounding Safari does not pause or extend the exam.
 - Local persistence of the most recently imported Markdown file (browser storage only).
 - PWA manifest and service worker for install/offline caching when hosted on HTTPS or localhost.
 - No backend, account, analytics or third-party libraries.
 
 ## Not included yet
 
-- Consolidated exam-mode timer.
 - Importing a ZIP with local image files.
 - Typeset LaTeX / equations.
 - Multi-select questions, negative marking, randomized options, or persistent attempt history.
@@ -89,8 +92,11 @@ The most recently imported Markdown text is stored in the browser's local storag
 1. Load the included sample paper.
 2. Confirm 5 questions, 5 answer keys and 5 explanations are found with no errors.
 3. Expand a preview and inspect an answer and explanation.
-4. Start untimed practice; select an answer and verify feedback appears immediately.
-5. Navigate backward and forward; confirm answers stay locked and visible.
-6. Finish and review the score and all explanations.
-7. Import a deliberately malformed file and confirm the Start button is disabled and errors are reported.
-8. When hosted via HTTPS, reload once online, then test reopening while offline.
+4. Start untimed regular practice; select an answer and verify feedback appears immediately. Navigate away and confirm the answer remains locked when you return.
+5. Start regular timed practice; verify the timer is per question and time expiry reveals that question's answer.
+6. Select Exam mode. Confirm the preview hides answer keys/explanations and the total duration equals question count multiplied by minutes per question.
+7. Start an exam; verify the countdown remains consolidated when navigating, choices can be changed, and no correctness or explanation is revealed.
+8. Submit an exam with unanswered questions and confirm the warning; submit and check the score, unanswered count, and explanations.
+9. Test automatic submission using a short paper and 0.25 minutes per question.
+10. Import a deliberately malformed file and confirm the Start button is disabled and errors are reported.
+11. When hosted via HTTPS, reload once online, then test reopening while offline.
