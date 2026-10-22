@@ -109,6 +109,27 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     })[char]);
   }
 
+  function normalizeArchivePath(path) {
+    let value = String(path || '').split(String.fromCharCode(92)).join('/');
+    try { value = decodeURIComponent(value); } catch (_) {}
+    const parts = [];
+    value.split('/').forEach((part) => {
+      if (!part || part === '.') return;
+      if (part === '..') { if (parts.length) parts.pop(); return; }
+      parts.push(part);
+    });
+    return parts.join('/');
+  }
+
+  function resolveImageReference(rawPath) {
+    const clean = String(rawPath || '').trim().replace(/^<|>$/g, '').split('?')[0].split('#')[0];
+    if (!clean || clean.includes('://') || clean.startsWith('//') || clean.startsWith('data:')) return '';
+    const base = state.markdownPath && state.markdownPath.includes('/')
+      ? state.markdownPath.slice(0, state.markdownPath.lastIndexOf('/')) : '';
+    const key = normalizeArchivePath([base, clean].filter(Boolean).join('/'));
+    return state.assetUrls.get(key) || '';
+  }
+
   function inlineMarkdown(source) {
     // Escape all source HTML first. This renderer intentionally does not permit raw HTML.
     let s = escapeHtml(source);
@@ -118,8 +139,13 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
       codeSlots.push(`<code>${code}</code>`);
       return token;
     });
-    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt) =>
-      `<span class="image-placeholder" role="note">Image not loaded in v1: ${alt ? escapeHtml(alt) : 'referenced image'}</span>`);
+    s = s.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (_, alt, rawPath) => {
+      const url = resolveImageReference(rawPath);
+      if (url) {
+        return '<figure class="markdown-image"><img src="' + escapeHtml(url) + '" alt="' + (alt || 'Question image') + '" loading="lazy"></figure>';
+      }
+      return '<span class="image-placeholder" role="note">Image not available in this import: ' + escapeHtml(alt || rawPath || 'referenced image') + '</span>';
+    });
     s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label) => `<span class="markdown-link-label">${label}</span>`);
     s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
     s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
