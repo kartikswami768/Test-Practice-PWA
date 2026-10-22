@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#173f35">
+  <meta name="description" content="An offline-friendly MCQ practice app that turns structured Markdown papers into interactive tests.">
+  <title>Recall — MCQ Practice</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a href="#" class="brand" id="brand-home" aria-label="Recall home">
+        <span class="brand-mark">R</span>
+        <span class="brand-copy"><strong>Recall</strong><small>MCQ practice desk</small></span>
+      </a>
+      <div class="topbar-actions">
+        <span id="connection-status" class="status-chip"><span class="status-dot"></span> Offline-ready</span>
+        <button id="install-button" class="button button-quiet hidden" type="button">Install app</button>
+      </div>
+    </header>
+
+    <main id="main-content" tabindex="-1">
+      <section id="import-view" class="view">
+        <div class="intro-grid">
+          <div class="intro-copy">
+            <p class="eyebrow">YOUR PAPERS, YOUR PACE</p>
+            <h1>Turn a question paper into a practice session.</h1>
+            <p class="lead">Import a structured Markdown file. Recall checks the format, previews the paper, then lets you practise question by question.</p>
+            <div class="feature-pills">
+              <span><i class="pill-dot"></i> Local-first</span>
+              <span><i class="pill-dot"></i> No account</span>
+              <span><i class="pill-dot"></i> Designed for iPad</span>
+            </div>
+          </div>
+          <div class="import-card">
+            <div class="upload-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M4 15.5v3A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg></div>
+            <h2>Open a question paper</h2>
+            <p class="muted">Choose a <code>.md</code> or <code>.markdown</code> file from Files.</p>
+            <label class="button button-primary file-picker" for="paper-file">Choose Markdown file</label>
+            <input id="paper-file" type="file" accept=".md,.markdown,text/markdown,text/plain" hidden>
+            <button id="sample-button" class="button button-secondary full-width" type="button">Load sample paper</button>
+            <p class="microcopy">Your file is processed on this device. It is not uploaded to a server.</p>
+          </div>
+        </div>
+
+        <section class="how-section" aria-labelledby="how-title">
+          <div class="section-heading">
+            <div><p class="eyebrow">THE WORKFLOW</p><h2 id="how-title">Three steps, no question-bank setup.</h2></div>
+          </div>
+          <div class="how-grid">
+            <article class="how-card"><span class="step-number">01</span><h3>Import</h3><p>Use the agreed Markdown structure for questions, four options, answers and explanations.</p></article>
+            <article class="how-card"><span class="step-number">02</span><h3>Validate</h3><p>Catch missing options, invalid answer keys and other formatting problems before practice.</p></article>
+            <article class="how-card"><span class="step-number">03</span><h3>Practise</h3><p>Answer each question and get immediate feedback with the full explanation.</p></article>
+          </div>
+        </section>
+        <section id="recent-paper" class="recent-card hidden" aria-live="polite"></section>
+      </section>
+
+      <section id="paper-view" class="view hidden">
+        <div class="page-heading">
+          <button id="back-to-import" class="text-button" type="button">← All papers</button>
+          <div class="page-heading-main"><p class="eyebrow">PAPER CHECK</p><h1 id="paper-title">Question paper</h1><p id="paper-subtitle" class="lead compact"></p></div>
+          <span id="validation-badge" class="validation-badge">Checking</span>
+        </div>
+        <div id="validation-summary" class="stat-grid"></div>
+        <div id="validation-messages" class="message-stack" aria-live="polite"></div>
+
+        <div class="paper-content-grid">
+          <section class="panel preview-panel">
+            <div class="panel-heading"><div><p class="eyebrow">PAPER CONTENT</p><h2>Question preview</h2></div><span id="preview-count" class="subtle-count"></span></div>
+            <div id="preview-list" class="preview-list"></div>
+          </section>
+          <aside class="panel settings-panel">
+            <p class="eyebrow">SESSION SETUP</p>
+            <h2>Regular practice</h2>
+            <p class="muted">See the answer and explanation immediately after choosing an option.</p>
+            <fieldset class="settings-fieldset">
+              <legend>Timer per question</legend>
+              <label class="radio-card"><input type="radio" name="practice-timer" value="0" checked><span><strong>Untimed</strong><small>Take as long as you need</small></span></label>
+              <label class="radio-card"><input type="radio" name="practice-timer" value="120"><span><strong>2 minutes</strong><small>Each question has its own timer</small></span></label>
+            </fieldset>
+            <div class="rule-note"><span class="note-icon">i</span><p>Exam mode with one consolidated timer will be added after this first working version.</p></div>
+            <button id="start-practice" class="button button-primary full-width" type="button">Start practice <span aria-hidden="true">→</span></button>
+            <button id="export-paper" class="button button-secondary full-width" type="button">Download source Markdown</button>
+          </aside>
+        </div>
+      </section>
+
+      <section id="practice-view" class="view hidden">
+        <div class="practice-header">
+          <button id="exit-practice" class="text-button" type="button">← Exit practice</button>
+          <div class="practice-paper-label"><span id="practice-paper-title">Question paper</span><span class="separator-dot">·</span><span id="practice-mode-label">Regular practice</span></div>
+          <div id="question-timer" class="timer-chip hidden" aria-live="off"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span>02:00</span></div>
+        </div>
+        <div class="progress-track" aria-label="Paper progress"><div id="progress-fill" class="progress-fill"></div></div>
+        <div class="practice-layout">
+          <section class="question-column">
+            <div class="question-meta"><span id="question-position">QUESTION 1 OF 1</span><span id="question-status" class="question-status">Not answered</span></div>
+            <article class="question-card">
+              <div id="practice-question" class="question-stem markdown-content"></div>
+              <div id="practice-options" class="answer-options" role="group" aria-label="Answer options"></div>
+              <div id="answer-feedback" class="answer-feedback hidden" aria-live="polite"></div>
+              <div class="question-footer">
+                <button id="previous-question" class="button button-secondary" type="button">← Previous</button>
+                <span id="answered-count" class="muted small-text">0 answered</span>
+                <button id="next-question" class="button button-primary" type="button">Next question →</button>
+              </div>
+            </article>
+            <div class="finish-row"><button id="finish-practice" class="text-button danger-text" type="button">Finish practice and view results</button></div>
+          </section>
+          <aside class="question-nav-panel panel">
+            <div class="panel-heading compact-heading"><div><p class="eyebrow">NAVIGATION</p><h2>Questions</h2></div><span id="nav-answered-count" class="subtle-count"></span></div>
+            <p class="muted small-text">Choose a number to move between questions.</p>
+            <div id="question-palette" class="question-palette" aria-label="Question navigation"></div>
+            <div class="palette-legend"><span><i class="legend-dot current"></i>Current</span><span><i class="legend-dot done"></i>Answered</span><span><i class="legend-dot"></i>Unanswered</span></div>
+          </aside>
+        </div>
+      </section>
+
+      <section id="results-view" class="view hidden">
+        <div class="results-heading"><p class="eyebrow">SESSION COMPLETE</p><h1>Practice review</h1><p id="results-subtitle" class="lead compact"></p></div>
+        <div id="results-stats" class="stat-grid results-stats"></div>
+        <div class="results-actions"><button id="retry-paper" class="button button-primary" type="button">Try again</button><button id="results-back" class="button button-secondary" type="button">Back to paper</button></div>
+        <div class="panel results-review"><div class="panel-heading"><div><p class="eyebrow">REVIEW</p><h2>Answers and explanations</h2></div></div><div id="results-review-list" class="preview-list"></div></div>
+      </section>
+    </main>
+
+    <footer class="app-footer"><span>Recall · Personal MCQ practice</span><span>Made to run locally on your device</span></footer>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+  <script src="app.js"></script>
+</body>
+</html>
