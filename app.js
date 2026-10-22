@@ -597,7 +597,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function timerTick() {
     const practice = state.practice;
-    if (!practice) return;
+    if (!practice || practice.endReason) return;
     if (practice.mode === 'exam') {
       if (Date.now() >= practice.examDeadlineAt) {
         finishPractice(true);
