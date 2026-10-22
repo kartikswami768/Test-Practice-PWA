@@ -4,6 +4,11 @@
 
   const STORAGE_MARKDOWN = 'recall.lastMarkdown.v1';
   const STORAGE_FILENAME = 'recall.lastFilename.v1';
+  const STORAGE_IMPORT_TYPE = 'recall.lastImportType.v1';
+  const PACKAGE_DB_NAME = 'recall-packages-v1';
+  const PACKAGE_STORE = 'packages';
+  const MAX_ZIP_BYTES = 100 * 1024 * 1024;
+  const MAX_ZIP_ENTRIES = 300;
   const SAMPLE_FILENAME = 'pharmacology-sample.md';
   const SAMPLE_MARKDOWN = `---
 schema_version: 1
@@ -98,7 +103,8 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   const el = (id) => document.getElementById(id);
   const state = {
-    markdown: '', filename: '', paper: null, validation: null,
+    markdown: '', filename: '', markdownPath: '', importBundleFilename: '',
+    assetUrls: new Map(), paper: null, validation: null,
     practice: null, timerInterval: null, toastTimeout: null, deferredInstallPrompt: null
   };
   const VIEW_IDS = ['import-view', 'paper-view', 'practice-view', 'results-view'];
