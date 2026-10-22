@@ -1,4 +1,4 @@
-const CACHE_NAME = 'recall-mcq-v2';
+const CACHE_NAME = 'recall-mcq-v3';
 const APP_ASSETS = [
   './',
   './index.html',
