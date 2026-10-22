@@ -354,21 +354,28 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     return `<div class="notice ${kind}"><span class="notice-icon">${icon}</span><p>${escapeHtml(message)}</p></div>`;
   }
 
-  function questionOptionPreview(option, question) {
-    const correct = question.correctAnswer === option.label;
+  function questionOptionPreview(option, question, hideAnswer = false) {
+    const correct = !hideAnswer && question.correctAnswer === option.label;
     return `<div class="preview-option ${correct ? 'is-correct' : ''}"><span class="opt-letter">${escapeHtml(option.label)}.</span><div class="markdown-content">${renderMarkdown(option.text)}</div></div>`;
   }
 
   function renderQuestionPreview(question) {
+    const examMode = document.querySelector('input[name="session-mode"]:checked')?.value === 'exam';
     const invalid = question.errors.length > 0;
-    const stateText = invalid ? `${question.errors.length} issue${question.errors.length === 1 ? '' : 's'}` : question.explanation.trim() ? `Answer key: ${question.correctAnswer}` : `Answer key: ${question.correctAnswer} · Explanation missing`;
-    const optionsHtml = question.options.map((option) => questionOptionPreview(option, question)).join('');
-    const explanationHtml = question.explanation.trim()
-      ? `<div class="preview-explanation"><h4>Explanation</h4><div class="markdown-content">${renderMarkdown(question.explanation)}</div></div>`
-      : `<div class="preview-explanation"><h4>Explanation</h4><p class="muted small-text">No explanation included in source.</p></div>`;
+    const stateText = invalid
+      ? `${question.errors.length} issue${question.errors.length === 1 ? '' : 's'}`
+      : examMode ? 'Exam preview · answers hidden'
+      : question.explanation.trim() ? `Answer key: ${question.correctAnswer}` : `Answer key: ${question.correctAnswer} · Explanation missing`;
+    const optionsHtml = question.options.map((option) => questionOptionPreview(option, question, examMode)).join('');
+    const explanationHtml = examMode
+      ? `<div class="preview-explanation"><p class="muted small-text">Answer and explanation are hidden in exam mode. They will be available after you submit the exam.</p></div>`
+      : question.explanation.trim()
+        ? `<div class="preview-explanation"><h4>Explanation</h4><div class="markdown-content">${renderMarkdown(question.explanation)}</div></div>`
+        : `<div class="preview-explanation"><h4>Explanation</h4><p class="muted small-text">No explanation included in source.</p></div>`;
     const issueHtml = question.errors.length ? `<div class="notice error"><span class="notice-icon">!</span><p>${question.errors.map(escapeHtml).join('<br>')}</p></div>` : '';
     const warningHtml = question.warnings.length ? `<div class="notice warning"><span class="notice-icon">!</span><p>${question.warnings.map(escapeHtml).join('<br>')}</p></div>` : '';
-    return `<details class="preview-item ${invalid ? 'invalid' : ''}"><summary class="preview-summary"><span class="question-number-chip">${escapeHtml(question.label)}</span><span class="preview-summary-text"><strong>${renderMarkdown(question.stem).replace(/^<p>|<\/p>$/g, '') || 'Question text missing'}</strong><small>${escapeHtml(stateText)}</small></span></summary><div class="preview-body">${issueHtml}${warningHtml}<div class="preview-options">${optionsHtml || '<p class="muted small-text">No options parsed.</p>'}</div>${question.correctAnswer ? `<p class="answer-key">Correct answer: ${escapeHtml(question.correctAnswer)}</p>` : ''}${explanationHtml}</div></details>`;
+    const answerHtml = !examMode && question.correctAnswer ? `<p class="answer-key">Correct answer: ${escapeHtml(question.correctAnswer)}</p>` : '';
+    return `<details class="preview-item ${invalid ? 'invalid' : ''}"><summary class="preview-summary"><span class="question-number-chip">${escapeHtml(question.label)}</span><span class="preview-summary-text"><strong>${renderMarkdown(question.stem).replace(/^<p>|<\/p>$/g, '') || 'Question text missing'}</strong><small>${escapeHtml(stateText)}</small></span></summary><div class="preview-body">${issueHtml}${warningHtml}<div class="preview-options">${optionsHtml || '<p class="muted small-text">No options parsed.</p>'}</div>${answerHtml}${explanationHtml}</div></details>`;
   }
 
   function renderPaperView() {
@@ -391,33 +398,83 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     el('preview-count').textContent = `${counts.questions} question${counts.questions === 1 ? '' : 's'}`;
     el('preview-list').innerHTML = paper.questions.length ? paper.questions.map(renderQuestionPreview).join('') : '<div class="notice error"><span class="notice-icon">!</span><p>No questions could be parsed. Check that each question starts with a heading like “## Q1”.</p></div>';
     el('start-practice').disabled = !valid;
-    el('start-practice').title = valid ? 'Start regular practice' : 'Correct the errors before starting';
+    updateSessionSetup();
+  }
+
+  function updateSessionSetup() {
+    const mode = document.querySelector('input[name="session-mode"]:checked')?.value || 'regular';
+    const isExam = mode === 'exam';
+    el('regular-timer-settings').classList.toggle('hidden', isExam);
+    el('exam-duration-settings').classList.toggle('hidden', !isExam);
+    el('start-practice').innerHTML = isExam
+      ? 'Start exam <span aria-hidden="true">→</span>'
+      : 'Start regular practice <span aria-hidden="true">→</span>';
+    el('start-practice').title = isExam ? 'Start the timed exam' : 'Start regular practice';
+    el('session-rule-note').textContent = isExam
+      ? 'The timer runs continuously across the whole paper. Answers can be changed until submission; explanations stay hidden during the exam.'
+      : 'In regular practice, the answer and explanation appear as soon as you choose an option.';
+    const rateInput = el('exam-minutes-per-question');
+    const rate = Number(rateInput.value);
+    const count = state.paper?.questions.length || state.validation?.counts.questions || 0;
+    if (!Number.isFinite(rate) || rate < 0.25 || rate > 10) {
+      el('exam-duration-preview').textContent = 'Enter a value between 0.25 and 10 minutes per question.';
+      rateInput.setAttribute('aria-invalid', 'true');
+    } else {
+      rateInput.removeAttribute('aria-invalid');
+      const totalMinutes = count * rate;
+      const totalLabel = totalMinutes % 1 === 0 ? String(totalMinutes) : String(Number(totalMinutes.toFixed(2)));
+      const duration = totalMinutes >= 60
+        ? `${Math.floor(totalMinutes / 60)} h${totalMinutes % 60 ? ` ${Number((totalMinutes % 60).toFixed(2))} min` : ''}`
+        : `${totalLabel} min`;
+      el('exam-duration-preview').textContent = count
+        ? `${count} questions × ${rate} min = ${duration} total.`
+        : 'Import a paper to calculate the total duration.';
+    }
   }
 
   function startPractice() {
     if (!state.validation?.valid) { showToast('Correct the validation errors before starting.'); return; }
+    const mode = document.querySelector('input[name="session-mode"]:checked')?.value || 'regular';
     const timerInput = document.querySelector('input[name="practice-timer"]:checked');
-    const timerSeconds = timerInput ? Number(timerInput.value) : 0;
+    const timerSeconds = mode === 'regular' && timerInput ? Number(timerInput.value) : 0;
+    const minutesPerQuestion = Number(el('exam-minutes-per-question').value);
+    if (mode === 'exam' && (!Number.isFinite(minutesPerQuestion) || minutesPerQuestion < 0.25 || minutesPerQuestion > 10)) {
+      showToast('Enter between 0.25 and 10 minutes per question.');
+      el('exam-minutes-per-question').focus();
+      return;
+    }
+    const totalDurationMs = mode === 'exam' ? Math.round(state.paper.questions.length * minutesPerQuestion * 60000) : 0;
+    const startedAt = Date.now();
     state.practice = {
+      mode,
       index: 0,
       limitSeconds: timerSeconds,
+      minutesPerQuestion: mode === 'exam' ? minutesPerQuestion : null,
+      totalDurationMs,
+      examDeadlineAt: mode === 'exam' ? startedAt + totalDurationMs : null,
+      endReason: null,
       answers: state.paper.questions.map(() => null),
       remainingMs: state.paper.questions.map(() => timerSeconds * 1000),
       activeStartedAt: null,
-      startedAt: Date.now()
+      startedAt
     };
     el('practice-paper-title').textContent = state.paper.title;
-    el('practice-mode-label').textContent = timerSeconds ? `${timerSeconds / 60} min/question` : 'Untimed practice';
+    el('practice-mode-label').textContent = mode === 'exam'
+      ? `Exam mode · ${state.paper.questions.length} questions`
+      : timerSeconds ? `${timerSeconds / 60} min/question` : 'Untimed practice';
+    el('finish-practice').textContent = mode === 'exam' ? 'Submit exam' : 'Finish practice and view results';
     showView('practice-view');
     renderPracticeQuestion(true);
     startTimer();
   }
 
   function answeredCount() {
-    return state.practice ? state.practice.answers.filter(Boolean).length : 0;
+    if (!state.practice) return 0;
+    return state.practice.answers.filter((answer) => state.practice.mode === 'exam' ? Boolean(answer?.selected) : Boolean(answer)).length;
   }
 
-  function questionStatusText(answer) {
+  function questionStatusText(answer, mode = 'regular') {
+    if (mode === 'exam') return answer?.selected ? 'Answered' : 'Not answered';
     if (!answer) return 'Not answered';
     if (answer.status === 'timeout') return 'Time expired';
     return answer.status === 'correct' ? 'Correct' : 'Incorrect';
@@ -444,28 +501,34 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
   function renderPracticeQuestion(shouldScroll = false) {
     if (!state.practice) return;
     const practice = state.practice;
+    const examMode = practice.mode === 'exam';
     const index = practice.index;
     const question = state.paper.questions[index];
     const answer = practice.answers[index];
     el('question-position').textContent = `QUESTION ${index + 1} OF ${state.paper.questions.length}`;
     const statusEl = el('question-status');
-    statusEl.textContent = questionStatusText(answer);
+    statusEl.textContent = questionStatusText(answer, practice.mode);
     statusEl.className = 'question-status';
-    if (answer?.status === 'correct') statusEl.classList.add('correct');
-    else if (answer?.status === 'incorrect') statusEl.classList.add('incorrect');
-    else if (answer?.status === 'timeout') statusEl.classList.add('timeout');
+    if (!examMode) {
+      if (answer?.status === 'correct') statusEl.classList.add('correct');
+      else if (answer?.status === 'incorrect') statusEl.classList.add('incorrect');
+      else if (answer?.status === 'timeout') statusEl.classList.add('timeout');
+    } else if (answer?.selected) {
+      statusEl.classList.add('answered');
+    }
     el('practice-question').innerHTML = renderMarkdown(question.stem);
     el('practice-options').innerHTML = question.options.map((option) => {
-      const isCorrect = option.label === question.correctAnswer;
+      const isCorrect = !examMode && answer && option.label === question.correctAnswer;
       const chosen = answer?.selected === option.label;
       const classes = ['answer-option'];
-      if (answer && isCorrect) classes.push('correct-answer');
-      if (answer && chosen && !isCorrect) classes.push('chosen-wrong');
-      return `<button type="button" class="${classes.join(' ')}" data-option="${escapeHtml(option.label)}" ${answer ? 'disabled' : ''}><span class="option-letter">${escapeHtml(option.label)}</span><span class="markdown-content">${renderMarkdown(option.text)}</span></button>`;
+      if (isCorrect) classes.push('correct-answer');
+      if (!examMode && answer && chosen && !isCorrect) classes.push('chosen-wrong');
+      if (examMode && chosen) classes.push('selected-option');
+      return `<button type="button" class="${classes.join(' ')}" data-option="${escapeHtml(option.label)}" aria-pressed="${chosen ? 'true' : 'false'}" ${!examMode && answer ? 'disabled' : ''}><span class="option-letter">${escapeHtml(option.label)}</span><span class="markdown-content">${renderMarkdown(option.text)}</span></button>`;
     }).join('');
     el('practice-options').querySelectorAll('button[data-option]').forEach((button) => button.addEventListener('click', () => selectAnswer(button.dataset.option)));
     const feedback = el('answer-feedback');
-    if (answer) {
+    if (answer && !examMode) {
       feedback.innerHTML = answerFeedback(question, answer);
       feedback.classList.remove('hidden', 'incorrect');
       if (answer.status !== 'correct') feedback.classList.add('incorrect');
@@ -475,7 +538,9 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
       feedback.classList.remove('incorrect');
     }
     el('previous-question').disabled = index === 0;
-    el('next-question').textContent = index === state.paper.questions.length - 1 ? 'View results →' : 'Next question →';
+    el('next-question').textContent = index === state.paper.questions.length - 1
+      ? examMode ? 'Submit exam →' : 'View results →'
+      : 'Next question →';
     el('answered-count').textContent = `${answeredCount()} of ${state.paper.questions.length} answered`;
     el('nav-answered-count').textContent = `${answeredCount()}/${state.paper.questions.length}`;
     el('progress-fill').style.width = `${(answeredCount() / state.paper.questions.length) * 100}%`;
@@ -483,15 +548,18 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
       const a = practice.answers[qIndex];
       const classes = ['palette-button'];
       if (qIndex === index) classes.push('current');
-      if (a?.status === 'correct') classes.push('done');
-      else if (a && a.status !== 'correct') classes.push('wrong');
+      if (examMode && a?.selected) classes.push('done');
+      else if (!examMode && a?.status === 'correct') classes.push('done');
+      else if (!examMode && a && a.status !== 'correct') classes.push('wrong');
       return `<button class="${classes.join(' ')}" type="button" data-index="${qIndex}" aria-label="Go to question ${q.number}" aria-current="${qIndex === index ? 'step' : 'false'}">${escapeHtml(q.number)}</button>`;
     }).join('');
     el('question-palette').querySelectorAll('button[data-index]').forEach((button) => button.addEventListener('click', () => navigateToQuestion(Number(button.dataset.index))));
     const timerChip = el('question-timer');
-    timerChip.classList.toggle('hidden', !practice.limitSeconds);
-    if (practice.limitSeconds) {
+    timerChip.classList.toggle('hidden', !(examMode || practice.limitSeconds));
+    if (!examMode && practice.limitSeconds) {
       if (!answer && practice.activeStartedAt === null) beginCurrentClock();
+      updateTimerDisplay();
+    } else if (examMode) {
       updateTimerDisplay();
     }
     if (shouldScroll) el('practice-view').scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -499,7 +567,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function pauseCurrentClock() {
     const practice = state.practice;
-    if (!practice || !practice.limitSeconds || practice.activeStartedAt === null) return;
+    if (!practice || practice.mode === 'exam' || !practice.limitSeconds || practice.activeStartedAt === null) return;
     const elapsed = Date.now() - practice.activeStartedAt;
     practice.remainingMs[practice.index] = Math.max(0, practice.remainingMs[practice.index] - elapsed);
     practice.activeStartedAt = null;
@@ -507,7 +575,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function beginCurrentClock() {
     const practice = state.practice;
-    if (!practice || !practice.limitSeconds || practice.answers[practice.index]) return;
+    if (!practice || practice.mode === 'exam' || !practice.limitSeconds || practice.answers[practice.index]) return;
     if (practice.remainingMs[practice.index] <= 0) {
       timeExpired();
       return;
@@ -517,7 +585,7 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function startTimer() {
     stopTimer();
-    if (!state.practice?.limitSeconds) return;
+    if (!state.practice || (state.practice.mode !== 'exam' && !state.practice.limitSeconds)) return;
     state.timerInterval = window.setInterval(timerTick, 200);
     updateTimerDisplay();
   }
@@ -529,7 +597,16 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function timerTick() {
     const practice = state.practice;
-    if (!practice || !practice.limitSeconds || practice.activeStartedAt === null) return;
+    if (!practice) return;
+    if (practice.mode === 'exam') {
+      if (Date.now() >= practice.examDeadlineAt) {
+        finishPractice(true);
+        return;
+      }
+      updateTimerDisplay();
+      return;
+    }
+    if (!practice.limitSeconds || practice.activeStartedAt === null) return;
     const remaining = practice.remainingMs[practice.index] - (Date.now() - practice.activeStartedAt);
     updateTimerDisplay(remaining);
     if (remaining <= 0) timeExpired();
@@ -537,36 +614,52 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
 
   function updateTimerDisplay(remainingOverride) {
     const practice = state.practice;
-    if (!practice?.limitSeconds) return;
-    let remaining = practice.remainingMs[practice.index];
-    if (remainingOverride !== undefined) remaining = remainingOverride;
-    else if (practice.activeStartedAt !== null) remaining -= Date.now() - practice.activeStartedAt;
+    if (!practice) return;
+    let remaining;
+    if (practice.mode === 'exam') {
+      remaining = practice.examDeadlineAt - Date.now();
+    } else {
+      if (!practice.limitSeconds) return;
+      remaining = practice.remainingMs[practice.index];
+      if (remainingOverride !== undefined) remaining = remainingOverride;
+      else if (practice.activeStartedAt !== null) remaining -= Date.now() - practice.activeStartedAt;
+    }
     remaining = Math.max(0, remaining);
     const totalSeconds = Math.ceil(remaining / 1000);
     const minutes = String(Math.floor(totalSeconds / 60)).padStart(2, '0');
     const seconds = String(totalSeconds % 60).padStart(2, '0');
     el('question-timer').querySelector('span').textContent = `${minutes}:${seconds}`;
-    el('question-timer').classList.toggle('urgent', totalSeconds <= 15 && totalSeconds > 0);
+    const urgentThreshold = practice.mode === 'exam' ? 60 : 15;
+    el('question-timer').classList.toggle('urgent', totalSeconds <= urgentThreshold && totalSeconds > 0);
+    el('question-timer').setAttribute('aria-label', practice.mode === 'exam' ? `Exam time remaining: ${minutes} minutes ${seconds} seconds` : `Question time remaining: ${minutes} minutes ${seconds} seconds`);
   }
 
   function selectAnswer(optionLabel) {
     const practice = state.practice;
-    if (!practice || practice.answers[practice.index]) return;
+    if (!practice) return;
+    const examMode = practice.mode === 'exam';
+    if (!examMode && practice.answers[practice.index]) return;
     const question = state.paper.questions[practice.index];
-    pauseCurrentClock();
+    if (!examMode) pauseCurrentClock();
     practice.answers[practice.index] = {
       selected: optionLabel,
-      status: optionLabel === question.correctAnswer ? 'correct' : 'incorrect',
+      status: examMode ? 'selected' : optionLabel === question.correctAnswer ? 'correct' : 'incorrect',
       at: Date.now()
     };
     renderPracticeQuestion();
-    if (practice.index < state.paper.questions.length - 1) showToast(practice.answers[practice.index].status === 'correct' ? 'Correct answer.' : 'Answer recorded. Review the explanation below.');
+    if (examMode) showToast('Answer saved. You can change it before submitting.');
+    else if (practice.index < state.paper.questions.length - 1) showToast(practice.answers[practice.index].status === 'correct' ? 'Correct answer.' : 'Answer recorded. Review the explanation below.');
     else showToast('Answer recorded. You can review it before finishing.');
   }
 
   function timeExpired() {
     const practice = state.practice;
-    if (!practice || practice.answers[practice.index]) return;
+    if (!practice) return;
+    if (practice.mode === 'exam') {
+      if (Date.now() >= practice.examDeadlineAt) finishPractice(true);
+      return;
+    }
+    if (practice.answers[practice.index]) return;
     practice.remainingMs[practice.index] = 0;
     practice.activeStartedAt = null;
     practice.answers[practice.index] = { selected: null, status: 'timeout', at: Date.now() };
@@ -577,16 +670,31 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
   function navigateToQuestion(nextIndex) {
     const practice = state.practice;
     if (!practice || nextIndex < 0 || nextIndex >= state.paper.questions.length || nextIndex === practice.index) return;
-    pauseCurrentClock();
+    if (practice.mode !== 'exam') pauseCurrentClock();
     practice.index = nextIndex;
-    if (practice.limitSeconds && !practice.answers[nextIndex]) beginCurrentClock();
+    if (practice.mode !== 'exam' && practice.limitSeconds && !practice.answers[nextIndex]) beginCurrentClock();
     renderPracticeQuestion();
   }
 
-  function finishPractice() {
+  function requestFinishPractice() {
+    if (!state.practice) return;
+    const unanswered = state.paper.questions.length - answeredCount();
+    if (state.practice.mode === 'exam') {
+      const message = unanswered
+        ? `Submit this exam with ${unanswered} unanswered question(s)? You cannot change answers after submission.`
+        : 'Submit this exam now? You cannot change answers after submission.';
+      if (!window.confirm(message)) return;
+    } else if (unanswered > 0 && !window.confirm(`Finish now? ${unanswered} question(s) are still unanswered.`)) {
+      return;
+    }
+    finishPractice(false);
+  }
+
+  function finishPractice(automatic = false) {
     if (!state.practice) return;
     pauseCurrentClock();
     stopTimer();
+    state.practice.endReason = automatic ? 'time-expired' : 'submitted';
     renderResults();
     showView('results-view');
   }
@@ -594,29 +702,44 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
   function renderResults() {
     const questions = state.paper.questions;
     const answers = state.practice.answers;
-    const correct = answers.filter((answer) => answer?.status === 'correct').length;
-    const incorrect = answers.filter((answer) => answer && answer.status !== 'correct').length;
-    const unanswered = answers.filter((answer) => !answer).length;
+    const examMode = state.practice.mode === 'exam';
+    const correct = questions.reduce((total, question, index) => {
+      const answer = answers[index];
+      return total + (answer && (examMode ? answer.selected === question.correctAnswer : answer.status === 'correct') ? 1 : 0);
+    }, 0);
+    const answered = answers.filter((answer) => examMode ? Boolean(answer?.selected) : Boolean(answer)).length;
+    const incorrect = examMode
+      ? answers.filter((answer, index) => answer?.selected && answer.selected !== questions[index].correctAnswer).length
+      : answers.filter((answer) => answer && answer.status !== 'correct').length;
+    const unanswered = questions.length - answered;
     const percent = questions.length ? Math.round((correct / questions.length) * 100) : 0;
-    const elapsedMs = Date.now() - state.practice.startedAt;
+    let elapsedMs = Date.now() - state.practice.startedAt;
+    if (examMode && state.practice.endReason === 'time-expired') elapsedMs = Math.min(elapsedMs, state.practice.totalDurationMs);
     const elapsedMinutes = Math.floor(elapsedMs / 60000);
     const elapsedSeconds = Math.floor((elapsedMs % 60000) / 1000);
-    el('results-subtitle').textContent = `${state.paper.title} · Time in session ${String(elapsedMinutes).padStart(2, '0')}:${String(elapsedSeconds).padStart(2, '0')}`;
+    const elapsedLabel = `${String(elapsedMinutes).padStart(2, '0')}:${String(elapsedSeconds).padStart(2, '0')}`;
+    const ending = examMode
+      ? state.practice.endReason === 'time-expired' ? 'Exam submitted automatically when time expired' : 'Exam submitted'
+      : 'Practice complete';
+    el('results-subtitle').textContent = `${state.paper.title} · ${ending} · Time used ${elapsedLabel}`;
     el('results-stats').innerHTML = [
       renderStat('Score', `${correct}/${questions.length}`, `${percent}% correct`),
       renderStat('Correct', correct, 'Answers matching the key'),
-      renderStat('Incorrect / timed out', incorrect, 'Answered incorrectly or ran out of time'),
+      renderStat('Incorrect', incorrect, 'Answered but incorrect'),
       renderStat('Unanswered', unanswered, 'Questions left blank')
     ].join('');
     el('results-review-list').innerHTML = questions.map((question, index) => {
       const answer = answers[index];
-      const answerStatus = !answer ? 'unanswered' : answer.status === 'correct' ? 'correct' : 'incorrect';
-      const statusLabel = !answer ? 'Unanswered' : answer.status === 'timeout' ? 'Timed out' : answer.status === 'correct' ? 'Correct' : 'Incorrect';
-      const userLabel = answer?.selected ? `Your answer: ${answer.selected}` : 'Your answer: —';
+      const selected = answer?.selected || null;
+      const isCorrect = selected === question.correctAnswer && Boolean(selected);
+      const wasAnswered = examMode ? Boolean(selected) : Boolean(answer);
+      const answerStatus = !wasAnswered ? 'unanswered' : isCorrect ? 'correct' : 'incorrect';
+      const statusLabel = answer?.status === 'timeout' ? 'Timed out' : !wasAnswered ? 'Unanswered' : isCorrect ? 'Correct' : 'Incorrect';
+      const userLabel = selected ? `Your answer: ${selected}` : 'Your answer: —';
       return `<details class="preview-item"><summary class="preview-summary"><span class="question-number-chip">${escapeHtml(question.label)}</span><span class="preview-summary-text"><strong>${renderMarkdown(question.stem).replace(/^<p>|<\/p>$/g, '')}</strong><span class="result-line"><span class="result-pill ${answerStatus}">${statusLabel}</span><span>${escapeHtml(userLabel)}</span><span>Key: ${escapeHtml(question.correctAnswer || 'Missing')}</span></span></span></summary><div class="preview-body"><div class="preview-options">${question.options.map((option) => {
-        const isCorrect = option.label === question.correctAnswer;
-        const chosenWrong = answer?.selected === option.label && !isCorrect;
-        return `<div class="preview-option ${isCorrect ? 'is-correct' : ''} ${chosenWrong ? 'chosen-wrong' : ''}"><span class="opt-letter">${escapeHtml(option.label)}.</span><div class="markdown-content">${renderMarkdown(option.text)}</div></div>`;
+        const optionIsCorrect = option.label === question.correctAnswer;
+        const chosenWrong = selected === option.label && !optionIsCorrect;
+        return `<div class="preview-option ${optionIsCorrect ? 'is-correct' : ''} ${chosenWrong ? 'chosen-wrong' : ''}"><span class="opt-letter">${escapeHtml(option.label)}.</span><div class="markdown-content">${renderMarkdown(option.text)}</div></div>`;
       }).join('')}</div><p class="answer-key">Correct answer: ${escapeHtml(question.correctAnswer || 'Missing')} · ${escapeHtml(userLabel)}</p><div class="preview-explanation"><h4>Explanation</h4>${question.explanation.trim() ? `<div class="markdown-content">${renderMarkdown(question.explanation)}</div>` : '<p class="muted small-text">No explanation included in source.</p>'}</div></div></details>`;
     }).join('');
   }
@@ -646,7 +769,9 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
   }
 
   function exitPractice() {
-    if (answeredCount() > 0 && !window.confirm('Exit this session? Your answers from the current session will be discarded.')) return;
+    if (state.practice?.mode === 'exam') {
+      if (!window.confirm('Exit this exam? All answers in the current exam will be discarded.')) return;
+    } else if (answeredCount() > 0 && !window.confirm('Exit this session? Your answers from the current session will be discarded.')) return;
     pauseCurrentClock();
     stopTimer();
     state.practice = null;
@@ -673,12 +798,19 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     el('export-paper').addEventListener('click', downloadSource);
     el('previous-question').addEventListener('click', () => navigateToQuestion(state.practice.index - 1));
     el('next-question').addEventListener('click', () => {
-      if (state.practice.index === state.paper.questions.length - 1) finishPractice();
-      else navigateToQuestion(state.practice.index + 1);
+      if (state.practice.index === state.paper.questions.length - 1) {
+        if (state.practice.mode === 'exam') requestFinishPractice();
+        else finishPractice();
+      } else navigateToQuestion(state.practice.index + 1);
     });
-    el('finish-practice').addEventListener('click', () => {
-      if (answeredCount() < state.paper.questions.length && !window.confirm(`Finish now? ${state.paper.questions.length - answeredCount()} question(s) are still unanswered.`)) return;
-      finishPractice();
+    el('finish-practice').addEventListener('click', requestFinishPractice);
+    document.querySelectorAll('input[name="session-mode"]').forEach((input) => input.addEventListener('change', () => {
+      updateSessionSetup();
+      if (state.validation) renderPaperView();
+    }));
+    el('exam-minutes-per-question').addEventListener('input', updateSessionSetup);
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && state.practice?.mode === 'exam') timerTick();
     });
     el('exit-practice').addEventListener('click', exitPractice);
     el('retry-paper').addEventListener('click', startPractice);
