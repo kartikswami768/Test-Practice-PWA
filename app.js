@@ -797,14 +797,129 @@ Insulin lispro is a rapid-acting insulin analogue used around mealtimes. Glargin
     }).join('');
   }
 
+  function openPackageDB() {
+    return new Promise((resolve, reject) => {
+      if (!('indexedDB' in window)) { reject(new Error('IndexedDB is unavailable.')); return; }
+      const request = indexedDB.open(PACKAGE_DB_NAME, 1);
+      request.onupgradeneeded = () => {
+        if (!request.result.objectStoreNames.contains(PACKAGE_STORE)) request.result.createObjectStore(PACKAGE_STORE);
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error || new Error('Could not open local package storage.'));
+    });
+  }
+
+  async function saveLastZipPackage(blob, markdownPath, bundleFilename) {
+    const db = await openPackageDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PACKAGE_STORE, 'readwrite');
+      tx.objectStore(PACKAGE_STORE).put({
+        blob: blob.slice(0, blob.size, 'application/zip'),
+        markdownPath: markdownPath,
+        bundleFilename: bundleFilename
+      }, 'lastZip');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('Could not save ZIP package.'));
+      tx.onabort = () => reject(tx.error || new Error('Saving ZIP package was aborted.'));
+    });
+    db.close();
+  }
+
+  async function readLastZipPackage() {
+    const db = await openPackageDB();
+    const saved = await new Promise((resolve, reject) => {
+      const tx = db.transaction(PACKAGE_STORE, 'readonly');
+      const request = tx.objectStore(PACKAGE_STORE).get('lastZip');
+      request.onsuccess = () => resolve(request.result || null);
+      request.onerror = () => reject(request.error || new Error('Could not read saved ZIP package.'));
+    });
+    db.close();
+    return saved;
+  }
+
+  async function deleteLastZipPackage() {
+    const db = await openPackageDB();
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(PACKAGE_STORE, 'readwrite');
+      tx.objectStore(PACKAGE_STORE).delete('lastZip');
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error || new Error('Could not clear saved ZIP package.'));
+    });
+    db.close();
+  }
+
+  async function loadZipFile(file) {
+    if (!window.JSZip) {
+      showToast('The ZIP reader has not loaded. Reconnect to the internet and reload the app.');
+      return;
+    }
+    if (file.size > MAX_ZIP_BYTES) {
+      showToast('ZIP is larger than 100 MB. Reduce image sizes and try again.');
+      return;
+    }
+    try {
+      showToast('Reading ZIP package…');
+      const zip = await window.JSZip.loadAsync(file);
+      const paths = Object.keys(zip.files);
+      if (paths.length > MAX_ZIP_ENTRIES) throw new Error('ZIP contains too many files; limit it to ' + MAX_ZIP_ENTRIES + ' entries.');
+      if (paths.some((path) => path.split('/').includes('..') || path.split(String.fromCharCode(92)).includes('..'))) {
+        throw new Error('ZIP includes an unsafe relative path.');
+      }
+      const markdownPaths = paths.filter((path) => {
+        if (zip.files[path].dir) return false;
+        const lower = path.toLowerCase();
+        if (path.split('/').some((part) => part === '__MACOSX' || part.startsWith('.'))) return false;
+        return lower.endsWith('.md') || lower.endsWith('.markdown');
+      });
+      if (markdownPaths.length !== 1) {
+        throw new Error('ZIP must contain exactly one .md or .markdown question paper. Found ' + markdownPaths.length + '.');
+      }
+      const markdownPath = markdownPaths[0];
+      const markdown = await zip.file(markdownPath).async('string');
+      const allowedImageExts = ['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'avif', 'svg'];
+      const imagePaths = paths.filter((path) => {
+        if (zip.files[path].dir) return false;
+        const ext = path.split('.').pop().toLowerCase();
+        return allowedImageExts.includes(ext);
+      });
+      const assets = [];
+      let imageBytes = 0;
+      for (const path of imagePaths) {
+        const bytes = await zip.file(path).async('uint8array');
+        imageBytes += bytes.byteLength;
+        if (imageBytes > 80 * 1024 * 1024) throw new Error('Extracted images exceed 80 MB. Reduce image sizes.');
+        const ext = path.split('.').pop().toLowerCase();
+        const mimeMap = {
+          png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
+          webp: 'image/webp', bmp: 'image/bmp', avif: 'image/avif', svg: 'image/svg+xml'
+        };
+        assets.push({ path: path, blob: new Blob([bytes], { type: mimeMap[ext] || 'application/octet-stream' }) });
+      }
+      const displayName = markdownPath.split('/').pop();
+      setPaper(markdown, displayName, {
+        markdownPath: markdownPath,
+        bundleFilename: file.name || 'question-paper.zip',
+        zipFile: file,
+        assets: assets
+      });
+      showToast('Imported paper and ' + assets.length + ' image asset(s).');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not read this ZIP package.');
+    }
+  }
+
   function loadFile(file) {
     if (!file) return;
+    if (file.name.toLowerCase().endsWith('.zip') || file.type === 'application/zip' || file.type === 'application/x-zip-compressed') {
+      loadZipFile(file);
+      return;
+    }
     if (!/\.(md|markdown)$/i.test(file.name) && file.type !== 'text/markdown' && file.type !== 'text/plain') {
-      showToast('Choose a Markdown text file (.md or .markdown).');
+      showToast('Choose a Markdown file (.md or .markdown) or a ZIP question-paper package.');
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => setPaper(String(reader.result || ''), file.name);
+    reader.onload = () => setPaper(String(reader.result || ''), file.name, null);
     reader.onerror = () => showToast('Could not read that file. Try saving it as UTF-8 Markdown.');
     reader.readAsText(file);
   }
